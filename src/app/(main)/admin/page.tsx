@@ -2,11 +2,9 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
 
 export default function AdminPage() {
   const { userRole } = useAuth();
-  const router = useRouter();
 
   const [identifier, setIdentifier] = useState('');
   const [name, setName] = useState('');
@@ -48,7 +46,8 @@ export default function AdminPage() {
       } else {
         setMessage({ type: 'error', text: data.error || 'Erro ao criar usuário' });
       }
-    } catch (error) {
+    } catch (err) {
+      console.error(err);
       setMessage({ type: 'error', text: 'Erro de conexão.' });
     } finally {
       setLoading(false);

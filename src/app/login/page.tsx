@@ -30,7 +30,7 @@ export default function LoginPage() {
       const formattedEmail = `${identifier.toLowerCase().trim()}@iait.aperam.com`;
       await signInWithEmailAndPassword(auth, formattedEmail, password);
       router.push('/');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setError('Credenciais inválidas. Verifique seu ID/Nome e senha.');
     } finally {
