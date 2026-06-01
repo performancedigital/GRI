@@ -1,9 +1,8 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
+import { User } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
@@ -26,36 +25,61 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [userRole, setUserRole] = useState<'admin' | 'user' | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchRole = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+      if (data && !error) {
+        setUserRole(data.role || 'user');
+      } else {
+        setUserRole('user');
+      }
+    } catch (err) {
+      console.error('Error fetching role:', err);
+      setUserRole('user');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    // Obter sessão inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const currentUser = session?.user ?? null;
       setUser(currentUser);
       if (currentUser) {
-        // Fetch user role from Firestore
-        try {
-          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-          if (userDoc.exists()) {
-            setUserRole(userDoc.data().role || 'user');
-          } else {
-            setUserRole('user');
-          }
-        } catch (error) {
-          console.error("Error fetching user role:", error);
-          setUserRole('user');
-        }
+        fetchRole(currentUser.id);
       } else {
-        setUserRole(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    // Escutar mudanças de autenticação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        await fetchRole(currentUser.id);
+      } else {
+        setUserRole(null);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const logout = async () => {
     try {
-      await signOut(auth);
+      await supabase.auth.signOut();
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error('Logout error:', error);
     }
   };
 

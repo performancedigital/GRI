@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 export async function POST(request: Request) {
   try {
@@ -10,27 +10,38 @@ export async function POST(request: Request) {
     }
 
     const email = `${identifier.toLowerCase().trim()}@iait.aperam.com`;
+    const supabaseAdmin = getSupabaseAdmin();
 
-    const adminAuth = getAdminAuth();
-    const adminDb = getAdminDb();
-
-    // Create user in Firebase Auth
-    const userRecord = await adminAuth.createUser({
+    // Cria o usuário de forma administrativa (autoverificado) no Supabase Auth
+    const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      displayName: name,
+      email_confirm: true,
+      user_metadata: { name }
     });
 
-    // Create user profile in Firestore
-    await adminDb.collection('users').doc(userRecord.uid).set({
-      identifier: identifier.toLowerCase().trim(),
-      name,
-      role: role || 'user',
-      points: 0,
-      createdAt: new Date().toISOString()
-    });
+    if (authError || !authUser.user) {
+      return NextResponse.json({ error: authError?.message || 'Erro ao criar autenticação' }, { status: 500 });
+    }
 
-    return NextResponse.json({ success: true, uid: userRecord.uid });
+    // Cria a linha de dados complementares na tabela de perfis (profiles)
+    const { error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .insert({
+        id: authUser.user.id,
+        identifier: identifier.toLowerCase().trim(),
+        name,
+        role: role || 'user',
+        points: 0
+      });
+
+    if (profileError) {
+      // Rollback se falhar na inserção da tabela (deleta o usuário do Auth para evitar sujeira)
+      await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+      return NextResponse.json({ error: profileError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, uid: authUser.user.id });
   } catch (error: unknown) {
     console.error('Error creating user:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';

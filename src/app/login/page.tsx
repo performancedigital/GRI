@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -26,13 +25,21 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // Converte o identificador simples em um email falso para o Firebase
-      const formattedEmail = `${identifier.toLowerCase().trim()}@iait.aperam.com`;
-      await signInWithEmailAndPassword(auth, formattedEmail, password);
-      router.push('/');
+      // Converte o identificador simples em um email falso para o Supabase Auth
+      const email = `${identifier.toLowerCase().trim()}@iait.aperam.com`;
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        setError('Credenciais inválidas. Verifique seu ID/Nome e senha.');
+      } else {
+        router.push('/');
+      }
     } catch (err: unknown) {
       console.error(err);
-      setError('Credenciais inválidas. Verifique seu ID/Nome e senha.');
+      setError('Erro de conexão com o servidor.');
     } finally {
       setLoading(false);
     }
