@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { adminAuth, adminDb } from '@/lib/firebase-admin';
+import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin';
 
 export async function POST(request: Request) {
   try {
@@ -10,6 +10,9 @@ export async function POST(request: Request) {
     }
 
     const email = `${identifier.toLowerCase().trim()}@iait.aperam.com`;
+
+    const adminAuth = getAdminAuth();
+    const adminDb = getAdminDb();
 
     // Create user in Firebase Auth
     const userRecord = await adminAuth.createUser({
